@@ -1,9 +1,8 @@
-# =============================================================================
-# Sample Spring Boot Application - pom.xml
-# This is a reference POM file for your Spring Boot project
-# =============================================================================
-
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- =============================================================================
+     Sample Spring Boot Application - pom.xml
+     This is a reference POM file for your Spring Boot project
+     ============================================================================= -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
