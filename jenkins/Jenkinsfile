@@ -8,6 +8,10 @@ pipeline {
     
     // Environment variables
     environment {
+        // Set proper paths and home directory
+        PATH = "/usr/local/bin:/usr/bin:/bin:${env.PATH}"
+        HOME = "/var/lib/jenkins"
+        
         // Docker Hub credentials (stored in Jenkins credentials)
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         
