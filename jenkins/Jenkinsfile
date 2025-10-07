@@ -88,10 +88,10 @@ pipeline {
                 // Run Maven build
                 sh '''
                     echo "Maven Version:"
-                    /opt/maven/bin/mvn --version
+                    mvn --version
                     
                     echo "\nBuilding application..."
-                    /opt/maven/bin/mvn clean compile -B
+                    mvn clean compile -B
                 '''
                 
                 script {
@@ -113,7 +113,7 @@ pipeline {
                 
                 // Run Maven tests
                 sh '''
-                    /opt/maven/bin/mvn test -B
+                    mvn test -B
                 '''
                 
                 script {
@@ -143,7 +143,7 @@ pipeline {
                 
                 // Create JAR file
                 sh '''
-                    /opt/maven/bin/mvn package -DskipTests -B
+                    mvn package -DskipTests -B
                     
                     echo "\nPackage details:"
                     ls -lh target/*.jar
