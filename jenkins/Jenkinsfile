@@ -1,0 +1,448 @@
+// =============================================================================
+// Jenkins Pipeline for Spring Boot CI/CD
+// Builds, tests, dockerizes, and deploys to Kubernetes (EKS)
+// =============================================================================
+
+pipeline {
+    agent any
+    
+    // Environment variables
+    environment {
+        // Set proper paths and home directory
+        PATH = "/usr/local/bin:/usr/bin:/bin:${env.PATH}"
+        HOME = "/var/lib/jenkins"
+        
+        // Docker Hub credentials (stored in Jenkins credentials)
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
+        
+        // Docker image details
+        DOCKER_IMAGE = "rituraj0/springboot-app"
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        
+        // AWS and EKS configuration
+        AWS_REGION = "ap-south-1"
+        EKS_CLUSTER_NAME = "springboot-eks-cluster"
+        
+        // Kubernetes configuration
+        K8S_NAMESPACE = "springboot-app"
+        K8S_DEPLOYMENT = "springboot-deployment"
+        
+        // Application configuration
+        APP_PORT = "8080"
+    }
+    
+    // Pipeline options
+    options {
+        // Keep only last 10 builds
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        
+        // Timeout for entire pipeline
+        timeout(time: 30, unit: 'MINUTES')
+        
+        // Disable concurrent builds
+        disableConcurrentBuilds()
+        
+        // Add timestamps to console output
+        timestamps()
+    }
+    
+    // Define stages
+    stages {
+        
+        // =====================================================================
+        // Stage 1: Checkout Source Code
+        // =====================================================================
+        stage('Checkout') {
+            steps {
+                script {
+                    echo '=========================================='
+                    echo 'Stage 1: Checking out source code...'
+                    echo '=========================================='
+                }
+                
+                // Clean workspace before checkout
+                deleteDir()
+                
+                // Checkout code from GitHub
+                checkout scm
+                
+                script {
+                    echo "✓ Successfully checked out code from repository"
+                    echo "Branch: ${env.GIT_BRANCH}"
+                    echo "Commit: ${env.GIT_COMMIT}"
+                }
+            }
+        }
+        
+        // =====================================================================
+        // Stage 2: Build with Maven
+        // =====================================================================
+        stage('Build') {
+            steps {
+                script {
+                    echo '=========================================='
+                    echo 'Stage 2: Building application with Maven...'
+                    echo '=========================================='
+                }
+                
+                // Run Maven build
+                sh '''
+                    echo "Maven Version:"
+                    mvn --version
+                    
+                    echo "\nBuilding application..."
+                    mvn clean compile -B
+                '''
+                
+                script {
+                    echo "✓ Build completed successfully"
+                }
+            }
+        }
+        
+        // =====================================================================
+        // Stage 3: Run Tests
+        // =====================================================================
+        stage('Test') {
+            steps {
+                script {
+                    echo '=========================================='
+                    echo 'Stage 3: Running tests...'
+                    echo '=========================================='
+                }
+                
+                // Run Maven tests
+                sh '''
+                    mvn test -B
+                '''
+                
+                script {
+                    echo "✓ All tests passed"
+                }
+            }
+            
+            // Post actions for test stage
+            post {
+                always {
+                    // Publish test results
+                    junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
+                }
+            }
+        }
+        
+        // =====================================================================
+        // Stage 4: Package Application
+        // =====================================================================
+        stage('Package') {
+            steps {
+                script {
+                    echo '=========================================='
+                    echo 'Stage 4: Packaging application...'
+                    echo '=========================================='
+                }
+                
+                // Create JAR file
+                sh '''
+                    mvn package -DskipTests -B
+                    
+                    echo "\nPackage details:"
+                    ls -lh target/*.jar
+                '''
+                
+                script {
+                    echo "✓ Application packaged successfully"
+                }
+            }
+            
+            // Archive artifacts
+            post {
+                success {
+                    archiveArtifacts artifacts: '**/target/*.jar', fingerprint: true
+                }
+            }
+        }
+        
+        // =====================================================================
+        // Stage 5: Build Docker Image
+        // =====================================================================
+        stage('Docker Build') {
+            steps {
+                script {
+                    echo '=========================================='
+                    echo 'Stage 5: Building Docker image...'
+                    echo '=========================================='
+                    echo "Image: ${DOCKER_IMAGE}:${IMAGE_TAG}"
+                }
+                
+                // Build Docker image
+                sh """
+                    # Copy Dockerfile to workspace root
+                    cp docker/Dockerfile .
+                    
+                    # Build Docker image
+                    docker build -t ${DOCKER_IMAGE}:${IMAGE_TAG} .
+                    docker tag ${DOCKER_IMAGE}:${IMAGE_TAG} ${DOCKER_IMAGE}:latest
+                    
+                    echo "\nDocker images:"
+                    docker images | grep springboot-app
+                """
+                
+                script {
+                    echo "✓ Docker image built successfully"
+                    echo "  - ${DOCKER_IMAGE}:${IMAGE_TAG}"
+                    echo "  - ${DOCKER_IMAGE}:latest"
+                }
+            }
+        }
+        
+        // =====================================================================
+        // Stage 6: Push Docker Image to Docker Hub
+        // =====================================================================
+        stage('Docker Push') {
+            steps {
+                script {
+                    echo '=========================================='
+                    echo 'Stage 6: Pushing Docker image to Docker Hub...'
+                    echo '=========================================='
+                }
+                
+                // Login to Docker Hub and push image
+                sh """
+                    # Login to Docker Hub
+                    echo \$DOCKERHUB_CREDENTIALS_PSW | docker login -u \$DOCKERHUB_CREDENTIALS_USR --password-stdin
+                    
+                    # Push images
+                    docker push ${DOCKER_IMAGE}:${IMAGE_TAG}
+                    docker push ${DOCKER_IMAGE}:latest
+                    
+                    # Logout
+                    docker logout
+                """
+                
+                script {
+                    echo "✓ Docker image pushed to Docker Hub"
+                    echo "  Repository: ${DOCKER_IMAGE}"
+                    echo "  Tags: ${IMAGE_TAG}, latest"
+                }
+            }
+        }
+        
+        // =====================================================================
+        // Stage 7: Configure kubectl for EKS
+        // =====================================================================
+        stage('Configure kubectl') {
+            steps {
+                script {
+                    echo '=========================================='
+                    echo 'Stage 7: Configuring kubectl for EKS...'
+                    echo '=========================================='
+                }
+                
+                // Configure kubectl to use EKS cluster
+                sh """
+                    # Use full paths for tools
+                    export PATH=/usr/local/bin:/usr/bin:\$PATH
+                    
+                    # Kubectl config already exists from server setup
+                    /usr/local/bin/kubectl version --client
+                    /usr/local/bin/kubectl get nodes
+                """
+                
+                script {
+                    echo "✓ kubectl configured for EKS cluster"
+                }
+            }
+        }
+        
+        // =====================================================================
+        // Stage 8: Deploy to Kubernetes (EKS)
+        // =====================================================================
+        stage('Deploy to EKS') {
+            steps {
+                script {
+                    echo '=========================================='
+                    echo 'Stage 8: Deploying to Kubernetes (EKS)...'
+                    echo '=========================================='
+                }
+                
+                // Deploy to Kubernetes
+                sh """
+                    # Use full paths for kubectl
+                    export PATH=/usr/local/bin:/usr/bin:\$PATH
+                    
+                    # Create namespace if it doesn't exist
+                    /usr/local/bin/kubectl create namespace ${K8S_NAMESPACE} --dry-run=client -o yaml | /usr/local/bin/kubectl apply -f -
+                    
+                    # Apply Kubernetes manifests
+                    /usr/local/bin/kubectl apply -f kubernetes/deployment.yml -n ${K8S_NAMESPACE}
+                    /usr/local/bin/kubectl apply -f kubernetes/service.yml -n ${K8S_NAMESPACE}
+                    
+                    # Update deployment with new image
+                    /usr/local/bin/kubectl set image deployment/${K8S_DEPLOYMENT} springboot-container=${DOCKER_IMAGE}:${IMAGE_TAG} -n ${K8S_NAMESPACE}
+                    
+                    # Wait for rollout to complete
+                    /usr/local/bin/kubectl rollout status deployment/${K8S_DEPLOYMENT} -n ${K8S_NAMESPACE} --timeout=5m
+                    
+                    # Display deployment status
+                    echo "\n========== Deployment Status =========="
+                    /usr/local/bin/kubectl get deployments -n ${K8S_NAMESPACE}
+                    echo "\n========== Pods Status =========="
+                    /usr/local/bin/kubectl get pods -n ${K8S_NAMESPACE}
+                    echo "\n========== Service Status =========="
+                    /usr/local/bin/kubectl get services -n ${K8S_NAMESPACE}
+                """
+                
+                script {
+                    echo "✓ Application deployed to EKS successfully"
+                }
+            }
+        }
+        
+        // =====================================================================
+        // Stage 9: Verify Deployment
+        // =====================================================================
+        stage('Verify Deployment') {
+            steps {
+                script {
+                    echo '=========================================='
+                    echo 'Stage 9: Verifying deployment...'
+                    echo '=========================================='
+                }
+                
+                // Verify deployment
+                sh """
+                    # Set AWS credentials
+                    export AWS_ACCESS_KEY_ID=\$AWS_CREDENTIALS_USR
+                    export AWS_SECRET_ACCESS_KEY=\$AWS_CREDENTIALS_PSW
+                    export PATH=/usr/local/bin:/usr/bin:\$PATH
+                    
+                    # Check pod status
+                    echo "Checking pod health..."
+                    /usr/local/bin/kubectl get pods -n ${K8S_NAMESPACE} -o wide
+                    
+                    # Get pod logs
+                    echo "\nRecent pod logs:"
+                    POD_NAME=\$(/usr/local/bin/kubectl get pods -n ${K8S_NAMESPACE} -l app=springboot-app -o jsonpath='{.items[0].metadata.name}')
+                    /usr/local/bin/kubectl logs \$POD_NAME -n ${K8S_NAMESPACE} --tail=20
+                    
+                    # Get service endpoint
+                    echo "\nService endpoint:"
+                    /usr/local/bin/kubectl get svc springboot-service -n ${K8S_NAMESPACE} -o wide
+                """
+                
+                script {
+                    echo "✓ Deployment verified successfully"
+                }
+            }
+        }
+        
+        // =====================================================================
+        // Stage 10: Cleanup Local Docker Images
+        // =====================================================================
+        stage('Cleanup') {
+            steps {
+                script {
+                    echo '=========================================='
+                    echo 'Stage 10: Cleaning up local Docker images...'
+                    echo '=========================================='
+                }
+                
+                // Remove local Docker images to save space
+                sh """
+                    # Remove old images (keep last 5 builds)
+                    docker images ${DOCKER_IMAGE} --format "{{.Tag}}" | sort -rn | tail -n +6 | xargs -r -I {} docker rmi ${DOCKER_IMAGE}:{} || true
+                    
+                    # Show remaining images
+                    echo "\nRemaining images:"
+                    docker images | grep springboot-app || echo "No images found"
+                """
+                
+                script {
+                    echo "✓ Cleanup completed"
+                }
+            }
+        }
+    }
+    
+    // =========================================================================
+    // Post-build Actions
+    // =========================================================================
+    post {
+        success {
+            script {
+                echo '=========================================='
+                echo '✓ PIPELINE COMPLETED SUCCESSFULLY!'
+                echo '=========================================='
+                echo "Build Number: ${BUILD_NUMBER}"
+                echo "Docker Image: ${DOCKER_IMAGE}:${IMAGE_TAG}"
+                echo "Deployed to: ${K8S_NAMESPACE} namespace"
+                echo '=========================================='
+            }
+            
+            // Send success notification (optional - requires email plugin)
+            // emailext(
+            //     subject: "✓ Build #${BUILD_NUMBER} - SUCCESS",
+            //     body: "Build completed successfully!\n\nImage: ${DOCKER_IMAGE}:${IMAGE_TAG}",
+            //     to: "team@example.com"
+            // )
+        }
+        
+        failure {
+            script {
+                echo '=========================================='
+                echo '✗ PIPELINE FAILED!'
+                echo '=========================================='
+                echo "Build Number: ${BUILD_NUMBER}"
+                echo "Stage: ${env.STAGE_NAME}"
+                echo '=========================================='
+            }
+            
+            // Send failure notification (optional - requires email plugin)
+            // emailext(
+            //     subject: "✗ Build #${BUILD_NUMBER} - FAILED",
+            //     body: "Build failed at stage: ${env.STAGE_NAME}",
+            //     to: "team@example.com"
+            // )
+        }
+        
+        always {
+            // Clean workspace after build
+            cleanWs(
+                deleteDirs: true,
+                patterns: [[pattern: 'target/**', type: 'INCLUDE']]
+            )
+            
+            script {
+                echo 'Pipeline execution completed.'
+            }
+        }
+    }
+}
+
+// =============================================================================
+// Pipeline Configuration Notes:
+//
+// 1. Required Jenkins Plugins:
+//    - Pipeline
+//    - Git
+//    - Docker Pipeline
+//    - Kubernetes CLI
+//    - AWS Steps
+//
+// 2. Required Jenkins Credentials:
+//    - dockerhub-credentials (Username/Password)
+//    - aws-credentials (AWS Credentials)
+//    - github-credentials (optional, for private repos)
+//
+// 3. Environment Variables to Update:
+//    - DOCKER_IMAGE: Your Docker Hub username/repository
+//    - AWS_REGION: Your AWS region
+//    - EKS_CLUSTER_NAME: Your EKS cluster name
+//
+// 4. Customize:
+//    - Email notifications (uncomment emailext blocks)
+//    - Build retention policy
+//    - Timeout values
+//    - Test result patterns
+//
+// =============================================================================

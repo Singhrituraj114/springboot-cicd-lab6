@@ -1,0 +1,152 @@
+# =============================================================================
+# Kubernetes Deployment for Spring Boot Application
+# Manages application pods with rolling updates and health checks
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: springboot-deployment
+  namespace: springboot-app
+  labels:
+    app: springboot-app
+    version: v1
+spec:
+  # Number of pod replicas
+  replicas: 3
+  
+  # Selector for pods
+  selector:
+    matchLabels:
+      app: springboot-app
+  
+  # Rolling update strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # Maximum number of pods that can be created over the desired number
+      maxUnavailable: 1  # Maximum number of pods that can be unavailable during update
+  
+  # Pod template
+  template:
+    metadata:
+      labels:
+        app: springboot-app
+        version: v1
+    spec:
+      containers:
+      - name: springboot-container
+        # Image will be updated by Jenkins pipeline
+        image: rituraj0/springboot-app:latest
+        imagePullPolicy: Always
+        
+        # Container port
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        
+        # Environment variables
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "prod"
+        - name: SERVER_PORT
+          value: "8080"
+        - name: JAVA_OPTS
+          value: "-Xmx512m -Xms256m"
+        
+        # Resource limits and requests
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        
+        # Liveness probe - checks if container is running
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 60  # Wait before first check
+          periodSeconds: 10        # Check every 10 seconds
+          timeoutSeconds: 3        # Timeout for each check
+          failureThreshold: 3      # Restart after 3 failures
+          successThreshold: 1
+        
+        # Readiness probe - checks if container is ready to serve traffic
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        
+        # Startup probe - for applications with slow startup
+        startupProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 10  # Allow up to 100 seconds for startup
+      
+      # Restart policy
+      restartPolicy: Always
+      
+      # DNS policy
+      dnsPolicy: ClusterFirst
+      
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+---
+# =============================================================================
+# Horizontal Pod Autoscaler (Optional)
+# Automatically scales pods based on CPU/memory usage
+# =============================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: springboot-hpa
+  namespace: springboot-app
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: springboot-deployment
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70  # Scale up if CPU > 70%
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80  # Scale up if memory > 80%
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # Wait 5 minutes before scaling down
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60  # Wait 1 minute before scaling up
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60

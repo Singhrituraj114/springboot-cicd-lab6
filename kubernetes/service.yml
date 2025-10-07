@@ -1,0 +1,89 @@
+# =============================================================================
+# Kubernetes Service for Spring Boot Application
+# Exposes application to external traffic via LoadBalancer
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: springboot-service
+  namespace: springboot-app
+  labels:
+    app: springboot-app
+  annotations:
+    # AWS Load Balancer annotations (for EKS)
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"  # Network Load Balancer
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  # Service type - LoadBalancer creates external load balancer
+  type: LoadBalancer
+  
+  # Selector to match pods
+  selector:
+    app: springboot-app
+  
+  # Ports configuration
+  ports:
+  - name: http
+    protocol: TCP
+    port: 8080        # Service port
+    targetPort: 8080  # Container port
+    # nodePort: 30080 # Uncomment for NodePort (if using NodePort type)
+
+---
+# =============================================================================
+# ClusterIP Service (Internal)
+# Alternative internal service for inter-service communication
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: springboot-service-internal
+  namespace: springboot-app
+  labels:
+    app: springboot-app
+spec:
+  type: ClusterIP
+  selector:
+    app: springboot-app
+  ports:
+  - name: http
+    protocol: TCP
+    port: 8080
+    targetPort: 8080
+
+---
+# =============================================================================
+# Ingress (Optional)
+# Alternative to LoadBalancer - requires Ingress Controller
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: springboot-ingress
+  namespace: springboot-app
+  annotations:
+    # NGINX Ingress Controller annotations
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # AWS ALB Ingress Controller annotations (alternative)
+    # kubernetes.io/ingress.class: alb
+    # alb.ingress.kubernetes.io/scheme: internet-facing
+    # alb.ingress.kubernetes.io/target-type: ip
+spec:
+  rules:
+  - host: springboot-app.example.com  # Replace with your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: springboot-service-internal
+            port:
+              number: 8080
+  # TLS configuration (optional)
+  # tls:
+  # - hosts:
+  #   - springboot-app.example.com
+  #   secretName: springboot-tls-secret

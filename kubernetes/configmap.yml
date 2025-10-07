@@ -1,0 +1,64 @@
+# =============================================================================
+# ConfigMap for Spring Boot Application
+# Store configuration data that can be consumed by pods
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: springboot-config
+  namespace: springboot-app
+data:
+  # Application properties
+  application.properties: |
+    spring.application.name=SpringBoot-CICD-App
+    server.port=8080
+    
+    # Logging configuration
+    logging.level.root=INFO
+    logging.level.com.example=DEBUG
+    
+    # Actuator endpoints
+    management.endpoints.web.exposure.include=health,info,metrics,prometheus
+    management.endpoint.health.show-details=always
+    
+  # Additional configuration
+  SPRING_PROFILES_ACTIVE: "prod"
+  LOG_LEVEL: "INFO"
+  MAX_CONNECTIONS: "100"
+
+---
+# =============================================================================
+# Secret for Sensitive Data (Optional)
+# Store sensitive information like database passwords
+# =============================================================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: springboot-secrets
+  namespace: springboot-app
+type: Opaque
+stringData:
+  # Database credentials (example)
+  DB_USERNAME: "admin"
+  DB_PASSWORD: "change-me-in-production"
+  
+  # API keys (example)
+  API_KEY: "your-api-key-here"
+
+---
+# =============================================================================
+# PersistentVolumeClaim (Optional)
+# Request persistent storage for application data
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: springboot-pvc
+  namespace: springboot-app
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp2  # AWS EBS storage class
+  resources:
+    requests:
+      storage: 10Gi
