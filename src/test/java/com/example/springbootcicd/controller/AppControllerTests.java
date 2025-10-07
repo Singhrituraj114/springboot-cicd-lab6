@@ -27,7 +27,8 @@ public class AppControllerTests {
     public void testHomeEndpoint() throws Exception {
         mockMvc.perform(get("/api/"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.application").value("Online Bookstore"))
+                .andExpect(jsonPath("$.version").value("2.0.0"))
                 .andExpect(jsonPath("$.status").value("running"));
     }
 
@@ -35,7 +36,8 @@ public class AppControllerTests {
     public void testHelloEndpoint() throws Exception {
         mockMvc.perform(get("/api/hello"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.message").value("Welcome to Online Bookstore!"))
+                .andExpect(jsonPath("$.version").value("2.0.0"));
     }
 
     @Test
