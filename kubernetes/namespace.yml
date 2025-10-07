@@ -1,0 +1,12 @@
+# =============================================================================
+# Kubernetes Namespace
+# Isolate application resources
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: springboot-app
+  labels:
+    name: springboot-app
+    environment: dev
+    managed-by: jenkins
