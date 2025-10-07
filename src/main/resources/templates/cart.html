@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopping Cart - Online Bookstore</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .header { background: rgba(255, 255, 255, 0.95); padding: 20px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+        .nav { display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 28px; font-weight: bold; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav-links { display: flex; gap: 30px; align-items: center; }
+        .nav-links a { text-decoration: none; color: #333; font-weight: 500; transition: color 0.3s; }
+        .nav-links a:hover { color: #667eea; }
+        .cart-badge { background: #667eea; color: white; padding: 5px 12px; border-radius: 20px; font-size: 14px; font-weight: bold; }
+        .main-content { padding: 40px 20px; max-width: 1000px; margin: 0 auto; }
+        .cart-header { background: white; padding: 30px; border-radius: 15px; margin-bottom: 30px; text-align: center; }
+        .cart-header h1 { color: #333; margin-bottom: 10px; }
+        .cart-item { background: white; border-radius: 15px; padding: 20px; margin-bottom: 20px; display: flex; gap: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .cart-item-image { width: 100px; height: 140px; object-fit: cover; border-radius: 8px; }
+        .cart-item-details { flex: 1; }
+        .cart-item-title { font-size: 20px; font-weight: bold; margin-bottom: 5px; }
+        .cart-item-author { color: #666; margin-bottom: 10px; }
+        .cart-item-price { font-size: 24px; color: #667eea; font-weight: bold; margin-bottom: 10px; }
+        .cart-item-actions { display: flex; gap: 10px; align-items: center; }
+        .quantity-control { display: flex; align-items: center; gap: 10px; }
+        .quantity-control input { width: 60px; text-align: center; padding: 5px; border: 2px solid #ddd; border-radius: 5px; }
+        .btn-update, .btn-remove { padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-update { background: #667eea; color: white; }
+        .btn-remove { background: #f44336; color: white; }
+        .cart-summary { background: white; padding: 30px; border-radius: 15px; }
+        .summary-row { display: flex; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #eee; }
+        .summary-total { font-size: 24px; font-weight: bold; color: #667eea; }
+        .btn-checkout { width: 100%; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+        .btn-checkout:hover { opacity: 0.9; }
+        .empty-cart { background: white; padding: 60px 20px; border-radius: 15px; text-align: center; }
+        .empty-cart h2 { color: #666; margin-bottom: 20px; }
+        .btn-continue { display: inline-block; padding: 15px 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 10px; font-weight: bold; }
+        .footer { background: rgba(255, 255, 255, 0.95); padding: 30px 20px; text-align: center; margin-top: 60px; }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <nav class="container">
+            <div class="nav">
+                <div class="logo">📚 Online Bookstore</div>
+                <div class="nav-links">
+                    <a href="/">Home</a>
+                    <a href="/books">All Books</a>
+                    <a href="/about">About</a>
+                    <a href="/cart" class="cart-badge">🛒 Cart (<span th:text="${cartCount}">0</span>)</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div class="main-content">
+        <div class="cart-header">
+            <h1>🛒 Your Shopping Cart</h1>
+            <p>Review your items before checkout</p>
+        </div>
+
+        <div th:if="${cartItems.isEmpty()}" class="empty-cart">
+            <h2>Your cart is empty</h2>
+            <p>Start adding some books to your cart!</p>
+            <a href="/books" class="btn-continue">Continue Shopping</a>
+        </div>
+
+        <div th:if="${!cartItems.isEmpty()}">
+            <div class="cart-item" th:each="item : ${cartItems}">
+                <img th:src="${item.book.imageUrl}" alt="Book" class="cart-item-image" onerror="this.src='https://via.placeholder.com/100x140?text=Book'">
+                <div class="cart-item-details">
+                    <div class="cart-item-title" th:text="${item.book.title}">Book Title</div>
+                    <div class="cart-item-author" th:text="${item.book.author}">Author</div>
+                    <div class="cart-item-price">$<span th:text="${item.book.price}">0.00</span></div>
+                    <div class="cart-item-actions">
+                        <form th:action="@{/cart/update/{id}(id=${item.id})}" method="post" class="quantity-control">
+                            <label>Quantity:</label>
+                            <input type="number" name="quantity" th:value="${item.quantity}" min="1" max="99">
+                            <button type="submit" class="btn-update">Update</button>
+                        </form>
+                        <form th:action="@{/cart/remove/{id}(id=${item.id})}" method="post">
+                            <button type="submit" class="btn-remove">Remove</button>
+                        </form>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        Subtotal: $<span th:text="${item.subtotal}">0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cart-summary">
+                <h2>Order Summary</h2>
+                <div class="summary-row">
+                    <span>Total Items:</span>
+                    <span th:text="${cartItems.size()}">0</span>
+                </div>
+                <div class="summary-row">
+                    <span>Total Amount:</span>
+                    <span class="summary-total">$<span th:text="${cartTotal}">0.00</span></span>
+                </div>
+                <a href="/checkout" class="btn-checkout">Proceed to Checkout</a>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <p><strong>Online Bookstore v2.0</strong></p>
+            <p>Deployed on Kubernetes via Jenkins CI/CD Pipeline</p>
+        </div>
+    </footer>
+</body>
+</html>

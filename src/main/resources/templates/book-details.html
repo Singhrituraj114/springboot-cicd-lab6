@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${book.title} + ' - Online Bookstore'">Book Details</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .header { background: rgba(255, 255, 255, 0.95); padding: 20px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+        .nav { display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 28px; font-weight: bold; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav-links { display: flex; gap: 30px; align-items: center; }
+        .nav-links a { text-decoration: none; color: #333; font-weight: 500; }
+        .cart-badge { background: #667eea; color: white; padding: 5px 12px; border-radius: 20px; font-size: 14px; font-weight: bold; }
+        .main-content { padding: 40px 20px; max-width: 1000px; margin: 0 auto; }
+        .book-details { background: white; padding: 40px; border-radius: 15px; display: grid; grid-template-columns: 1fr 1.5fr; gap: 40px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+        .book-image-large { width: 100%; max-width: 400px; height: auto; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .book-info h1 { font-size: 32px; margin-bottom: 15px; color: #333; }
+        .book-author-large { font-size: 20px; color: #666; margin-bottom: 20px; }
+        .book-category-large { display: inline-block; background: #f0f0f0; padding: 8px 20px; border-radius: 20px; font-size: 14px; color: #667eea; font-weight: bold; margin-bottom: 20px; }
+        .book-price-large { font-size: 36px; font-weight: bold; color: #667eea; margin: 20px 0; }
+        .book-description { font-size: 16px; line-height: 1.6; color: #555; margin: 20px 0; }
+        .book-meta { background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0; }
+        .meta-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #ddd; }
+        .btn-add-to-cart { width: 100%; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+        .btn-add-to-cart:hover { opacity: 0.9; }
+        .btn-back { display: inline-block; padding: 10px 20px; background: white; color: #667eea; border: 2px solid #667eea; border-radius: 8px; text-decoration: none; font-weight: bold; margin-bottom: 20px; }
+        .status-badge { display: inline-block; padding: 8px 15px; border-radius: 8px; font-size: 14px; font-weight: bold; }
+        .in-stock { background: #d4edda; color: #155724; }
+        .out-of-stock { background: #f8d7da; color: #721c24; }
+        .footer { background: rgba(255, 255, 255, 0.95); padding: 30px 20px; text-align: center; margin-top: 60px; }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <nav class="container">
+            <div class="nav">
+                <div class="logo">📚 Online Bookstore</div>
+                <div class="nav-links">
+                    <a href="/">Home</a>
+                    <a href="/books">All Books</a>
+                    <a href="/about">About</a>
+                    <a href="/cart" class="cart-badge">🛒 Cart (<span th:text="${cartCount}">0</span>)</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div class="main-content">
+        <a href="/books" class="btn-back">← Back to Books</a>
+        
+        <div class="book-details">
+            <div>
+                <img th:src="${book.imageUrl}" alt="Book Cover" class="book-image-large" onerror="this.src='https://via.placeholder.com/400x600?text=Book+Cover'">
+            </div>
+            
+            <div class="book-info">
+                <h1 th:text="${book.title}">Book Title</h1>
+                <p class="book-author-large">by <span th:text="${book.author}">Author Name</span></p>
+                <span class="book-category-large" th:text="${book.category}">Category</span>
+                
+                <div class="book-price-large">$<span th:text="${book.price}">0.00</span></div>
+                
+                <span th:if="${book.stock > 0}" class="status-badge in-stock">✓ In Stock (<span th:text="${book.stock}">0</span> available)</span>
+                <span th:if="${book.stock == 0}" class="status-badge out-of-stock">✗ Out of Stock</span>
+                
+                <p class="book-description" th:text="${book.description}">Book description goes here...</p>
+                
+                <div class="book-meta">
+                    <h3>Book Details</h3>
+                    <div class="meta-row">
+                        <span>ISBN:</span>
+                        <strong th:text="${book.isbn}">N/A</strong>
+                    </div>
+                    <div class="meta-row">
+                        <span>Category:</span>
+                        <strong th:text="${book.category}">N/A</strong>
+                    </div>
+                    <div class="meta-row">
+                        <span>Availability:</span>
+                        <strong><span th:text="${book.stock}">0</span> in stock</strong>
+                    </div>
+                </div>
+                
+                <form th:action="@{/cart/add/{id}(id=${book.id})}" method="post">
+                    <button type="submit" class="btn-add-to-cart" th:disabled="${book.stock == 0}">
+                        <span th:if="${book.stock > 0}">🛒 Add to Cart</span>
+                        <span th:if="${book.stock == 0}">Out of Stock</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <p><strong>Online Bookstore v2.0</strong></p>
+            <p>Deployed on Kubernetes via Jenkins CI/CD Pipeline</p>
+        </div>
+    </footer>
+</body>
+</html>
