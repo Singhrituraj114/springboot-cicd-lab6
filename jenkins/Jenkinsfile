@@ -11,15 +11,12 @@ pipeline {
         // Docker Hub credentials (stored in Jenkins credentials)
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         
-        // AWS credentials (stored in Jenkins credentials)
-        AWS_CREDENTIALS = credentials('aws-credentials')
-        
         // Docker image details
         DOCKER_IMAGE = "rituraj0/springboot-app"
         IMAGE_TAG = "${BUILD_NUMBER}"
         
         // AWS and EKS configuration
-        AWS_REGION = "us-east-1"
+        AWS_REGION = "ap-south-1"
         EKS_CLUSTER_NAME = "springboot-eks-cluster"
         
         // Kubernetes configuration
@@ -239,17 +236,12 @@ pipeline {
                 
                 // Configure kubectl to use EKS cluster
                 sh """
-                    # Configure AWS credentials
-                    export AWS_ACCESS_KEY_ID=\$AWS_CREDENTIALS_USR
-                    export AWS_SECRET_ACCESS_KEY=\$AWS_CREDENTIALS_PSW
-                    export AWS_DEFAULT_REGION=${AWS_REGION}
+                    # Use full paths for tools
+                    export PATH=/usr/local/bin:/usr/bin:\$PATH
                     
-                    # Update kubeconfig for EKS
-                    aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
-                    
-                    # Verify connection
-                    kubectl version --client
-                    kubectl get nodes
+                    # Kubectl config already exists from server setup
+                    /usr/local/bin/kubectl version --client
+                    /usr/local/bin/kubectl get nodes
                 """
                 
                 script {
@@ -271,31 +263,29 @@ pipeline {
                 
                 // Deploy to Kubernetes
                 sh """
-                    # Set AWS credentials
-                    export AWS_ACCESS_KEY_ID=\$AWS_CREDENTIALS_USR
-                    export AWS_SECRET_ACCESS_KEY=\$AWS_CREDENTIALS_PSW
-                    export AWS_DEFAULT_REGION=${AWS_REGION}
+                    # Use full paths for kubectl
+                    export PATH=/usr/local/bin:/usr/bin:\$PATH
                     
                     # Create namespace if it doesn't exist
-                    kubectl create namespace ${K8S_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                    /usr/local/bin/kubectl create namespace ${K8S_NAMESPACE} --dry-run=client -o yaml | /usr/local/bin/kubectl apply -f -
                     
                     # Apply Kubernetes manifests
-                    kubectl apply -f kubernetes/deployment.yml -n ${K8S_NAMESPACE}
-                    kubectl apply -f kubernetes/service.yml -n ${K8S_NAMESPACE}
+                    /usr/local/bin/kubectl apply -f kubernetes/deployment.yml -n ${K8S_NAMESPACE}
+                    /usr/local/bin/kubectl apply -f kubernetes/service.yml -n ${K8S_NAMESPACE}
                     
                     # Update deployment with new image
-                    kubectl set image deployment/${K8S_DEPLOYMENT} springboot-container=${DOCKER_IMAGE}:${IMAGE_TAG} -n ${K8S_NAMESPACE}
+                    /usr/local/bin/kubectl set image deployment/${K8S_DEPLOYMENT} springboot-container=${DOCKER_IMAGE}:${IMAGE_TAG} -n ${K8S_NAMESPACE}
                     
                     # Wait for rollout to complete
-                    kubectl rollout status deployment/${K8S_DEPLOYMENT} -n ${K8S_NAMESPACE} --timeout=5m
+                    /usr/local/bin/kubectl rollout status deployment/${K8S_DEPLOYMENT} -n ${K8S_NAMESPACE} --timeout=5m
                     
                     # Display deployment status
                     echo "\n========== Deployment Status =========="
-                    kubectl get deployments -n ${K8S_NAMESPACE}
+                    /usr/local/bin/kubectl get deployments -n ${K8S_NAMESPACE}
                     echo "\n========== Pods Status =========="
-                    kubectl get pods -n ${K8S_NAMESPACE}
+                    /usr/local/bin/kubectl get pods -n ${K8S_NAMESPACE}
                     echo "\n========== Service Status =========="
-                    kubectl get services -n ${K8S_NAMESPACE}
+                    /usr/local/bin/kubectl get services -n ${K8S_NAMESPACE}
                 """
                 
                 script {
@@ -320,20 +310,20 @@ pipeline {
                     # Set AWS credentials
                     export AWS_ACCESS_KEY_ID=\$AWS_CREDENTIALS_USR
                     export AWS_SECRET_ACCESS_KEY=\$AWS_CREDENTIALS_PSW
-                    export AWS_DEFAULT_REGION=${AWS_REGION}
+                    export PATH=/usr/local/bin:/usr/bin:\$PATH
                     
                     # Check pod status
                     echo "Checking pod health..."
-                    kubectl get pods -n ${K8S_NAMESPACE} -o wide
+                    /usr/local/bin/kubectl get pods -n ${K8S_NAMESPACE} -o wide
                     
                     # Get pod logs
                     echo "\nRecent pod logs:"
-                    POD_NAME=\$(kubectl get pods -n ${K8S_NAMESPACE} -l app=springboot-app -o jsonpath='{.items[0].metadata.name}')
-                    kubectl logs \$POD_NAME -n ${K8S_NAMESPACE} --tail=20
+                    POD_NAME=\$(/usr/local/bin/kubectl get pods -n ${K8S_NAMESPACE} -l app=springboot-app -o jsonpath='{.items[0].metadata.name}')
+                    /usr/local/bin/kubectl logs \$POD_NAME -n ${K8S_NAMESPACE} --tail=20
                     
                     # Get service endpoint
                     echo "\nService endpoint:"
-                    kubectl get svc springboot-service -n ${K8S_NAMESPACE} -o wide
+                    /usr/local/bin/kubectl get svc springboot-service -n ${K8S_NAMESPACE} -o wide
                 """
                 
                 script {
